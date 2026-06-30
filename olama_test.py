@@ -22,37 +22,47 @@ def get_news() -> str:
   """Get relevant news
 
   Returns:
-    The current a summury of news
+    The current a summary of news
   """
 
   return "there are no news"
 
 def Talk(user_in) :
+
+
+
+    system_prompt_ger = """Du bist ein Gesprächspartner.
+
+    WICHTIGE REGELN:
+    - Erwähne niemals Werkzeuge, deren Verwendung, Funktionen, APIs oder Systemfähigkeiten.
+    - Erkläre niemals, warum ein Werkzeug verwendet wurde oder nicht.
+    - Sage niemals, dass du keine Werkzeuge verwenden kannst.
+    - Sprich niemals über Einschränkungen oder interne Abläufe.
+
+    Wenn der Nutzer etwas Alltägliches sagt (z. B. Begrüßungen, Dank, Smalltalk):
+    → Antworte natürlich, wie in einem menschlichen Gespräch.
+
+    Wenn kein Werkzeug benötigt wird:
+    → Antworte einfach ganz normal in verständlicher Sprache.
+
+    Entscheide nur im Stillen, ob ein Werkzeug benötigt wird. Sprich nicht über diese Entscheidung."""
+
     messages = [    {
         "role": "system",
-        "content": (
-            "You are Jarvis, a helpful offline voice assistant."
-
-            "Your responses will be read aloud by a text-to-speech engine."
-
-            """Always:
-            - Speak naturally as if talking to a person.
-            - Avoid markdown, bullet points, and numbered lists unless requested.
-            - Avoid mentioning formatting.
-            - Keep responses concise unless asked for more detail.
-            - When using tools, never mention the tool itself. Simply explain the result naturally.
-            - If you don't know something, say so honestly."""
-
-        )
+        "content": system_prompt_ger
     },{"role": "user", "content": user_in}]
 
     response = chat(model='llama3.1:8b', messages=messages, tools=[get_temperature,get_news])
 
-    print(response.message)
+    assistant_message = {
+        "role": "assistant",
+        "content": response.message.content or "",
+        "tool_calls": response.message.tool_calls
+    }
 
-    messages.append(response.message)
+    messages.append(assistant_message)
+
     if response.message.tool_calls:
-    # only recommended for models which only return a single tool call
         for call in response.message.tool_calls:
             match call.function.name:
                 case "get_temperature":
@@ -62,11 +72,17 @@ def Talk(user_in) :
                 case _:
                     result = "wrong tool"
 
-            messages.append({"role": "tool", "tool_name": call.function.name, "content": str(result)})
+            messages.append({
+                "role": "tool",
+                "content": str(result)
+            })
 
-    final_response = chat(model='llama3.1:8b', messages=messages)
-    return final_response.message.content
+        final_response = chat(
+            model='llama3.1:8b',
+            messages=messages,
+            tools=[get_temperature, get_news]
+        )
 
+        return final_response.message.content
 
-res = Talk("wie viel grad sind es in New York? und gibt es gerade nachrichten")
-print(res)
+    return response.message.content
